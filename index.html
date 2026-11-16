@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#171717">
+<title>Универсальные заметки</title>
+<style>
+:root{--bg:#171717;--red:#df0808;--white:#f4f4f4;--muted:#aaa}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;font-family:Arial,Helvetica,sans-serif;background:#ededed;color:#171717}
+body{min-height:100svh;display:flex;align-items:center;justify-content:center;padding:16px}
+.app-meta{position:fixed;top:14px;left:50%;transform:translateX(-50%);width:min(100% - 32px,390px);display:flex;justify-content:space-between;color:#888;font-size:11px;letter-spacing:.04em}
+.app{width:100%;max-width:390px;height:min(760px,calc(100svh - 76px));min-height:570px;background:var(--bg);color:var(--white);padding:25px 19px 27px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 35px #00000018}
+.screen{display:none;flex:1;min-height:0;flex-direction:column}
+.screen.active{display:flex}
+button,input,textarea{font:inherit}
+button{cursor:pointer}
+.brand{font-size:clamp(48px,13vw,64px);line-height:1.03;font-weight:300;letter-spacing:-.055em;text-transform:uppercase;margin:auto -32px;width:calc(100% + 64px);overflow-wrap:anywhere}
+.brand span{display:block}.brand .right{text-align:right}
+.actions{display:flex;flex-direction:column;gap:12px;margin-top:26px}
+.primary{border:0;background:var(--red);color:white;font-weight:700;font-size:13px;padding:16px 22px;min-height:49px;clip-path:polygon(12% 0,100% 0,88% 100%,0 100%);filter:drop-shadow(0 8px 10px #df08085c)}
+.text-button{border:0;background:transparent;color:#eee;font-size:12px;padding:8px}
+.auth{background:linear-gradient(180deg,#f0f0f0 0%,#d8d8d8 43%,#222 100%);color:#171717;padding:23px 22px 26px}
+.back{border:0;background:transparent;color:#555;font-size:24px;align-self:flex-start;padding:0 0 10px}
+.auth-title{font-size:clamp(26px,7vw,32px);line-height:1.12;text-transform:uppercase;font-weight:500;letter-spacing:-.045em;text-align:right;margin:40px -8px 32px 0}
+.auth-title span{display:block}
+.form{display:flex;flex-direction:column;gap:13px}
+.form input,.code-input{width:100%;height:49px;flex:0 0 49px;border:0;border-radius:28px;background:linear-gradient(145deg,#fff,#e9e9e9);box-shadow:inset 0 2px 5px #0000000b,0 3px 8px #0000000c;padding:0 18px;text-align:center;font-size:13px;outline:none;color:#222}
+.form input::placeholder{color:#bcbcbc}
+.form input:focus,.code-input:focus{box-shadow:0 0 0 2px #df0808aa}
+.submit{width:82%;align-self:center;margin-top:10px}
+.bottom-prompt{margin:auto 0 0;text-align:center;color:#eee;font-size:12px;padding-top:24px}
+.bottom-prompt button,.inline-link{color:var(--red);font-weight:bold;background:none;border:0;padding:0;text-decoration:underline}
+.verify-copy{font-size:13px;line-height:1.5;color:#333;text-align:center;margin:-12px 0 22px}
+.code-input{font-size:22px;letter-spacing:.55em;padding-left:calc(18px + .55em);font-weight:600}
+.verify-actions{display:flex;flex-direction:column;align-items:center;gap:15px;margin-top:8px}
+.verify-note{font-size:11px;color:#eee;text-align:center;margin-top:auto;line-height:1.5}
+.home{padding:24px 18px 28px;background:#171717}
+.home-top{display:flex;align-items:center;gap:14px;height:24px;margin-bottom:25px}
+.icon-button{display:flex;align-items:center;justify-content:center;width:20px;height:22px;padding:0;border:0;background:transparent;color:#aaa}
+.icon-button svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.5}
+.home-heading{font-size:clamp(18px,5.2vw,24px);font-weight:400;letter-spacing:-.045em;white-space:nowrap;margin:0 0 10px;color:#eee}
+.home-heading button{font:inherit;color:#777;background:none;border:0;padding:0}
+.home-heading button.active{color:#fff}
+.add-note{align-self:flex-start;width:39px;height:37px;border:0;border-radius:7px 7px 9px 9px;background:var(--red);color:#fff;font-size:21px;line-height:1;box-shadow:0 8px 16px #df080855;transform:skew(-8deg);margin:0 0 18px}
+.note-list{display:flex;flex-direction:column;gap:12px;overflow:auto;padding:2px 1px 8px}
+.note-pill{height:36px;min-height:36px;width:100%;border:0;border-radius:24px 24px 20px 20px;background:linear-gradient(180deg,#fff 0%,#f7f7f7 55%,#d9d9d9 100%);color:#171717;font-size:11px;box-shadow:0 3px 5px #0005;clip-path:polygon(9% 0,100% 0,91% 100%,0 100%);padding:0 20px;text-align:center}
+.editor{background:#171717;padding:24px 18px 25px;color:#e8e8e8}
+.editor-toolbar{display:flex;align-items:center;justify-content:space-between;height:34px;margin-bottom:16px}
+.editor-tools{display:flex;align-items:center;gap:18px}
+.editor-divider{height:1px;background:#aaa;width:100%;margin-bottom:25px;opacity:.8}
+.editor-title{width:100%;border:0;outline:0;background:transparent;color:#eee;font-size:clamp(25px,7vw,35px);font-weight:400;letter-spacing:-.04em;margin:0 0 30px;padding:0}
+.editor-title::placeholder,.editor-body::placeholder{color:#bdbdbd;opacity:1}
+.editor-body{width:100%;flex:1;min-height:180px;resize:none;border:0;outline:0;background:transparent;color:#e4e4e4;font-size:17px;line-height:1.3;padding:0;overflow:auto}
+.editor-footer{display:flex;align-items:center;justify-content:space-between;margin-top:12px;color:#888;font-size:10px}
+.save-button{border:0;background:var(--red);color:#fff;padding:10px 20px;font-size:11px;font-weight:bold;clip-path:polygon(10% 0,100% 0,90% 100%,0 100%)}
+.toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,18px);background:#171717;color:#fff;border-radius:22px;padding:12px 17px;font-size:12px;opacity:0;pointer-events:none;transition:.2s;z-index:10;max-width:90%;text-align:center;box-shadow:0 8px 24px #0003}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+@media(max-height:650px){.app{min-height:0;height:calc(100svh - 65px);padding-top:16px;padding-bottom:16px}.auth-title{margin-top:22px;margin-bottom:20px}.form{gap:9px}.form input,.code-input{height:43px;flex-basis:43px}.brand{font-size:47px}}
+</style>
+</head>
+<body>
+<div class="app-meta"><strong>УНИВЕРСАЛЬНЫЕ ЗАМЕТКИ</strong><span id="screen-name">index</span></div>
+<main class="app">
+ <section class="screen active" id="index">
+  <div class="brand"><span>УНИ</span><span>ВЕРСАЛЬ</span><span>НЫЕ</span><span class="right">ЗАМЕТ</span><span>КИ</span></div>
+  <div class="actions">
+   <button class="primary" onclick="show('registration')">зарегистрироваться</button>
+   <button class="text-button" onclick="show('login')">войти</button>
+  </div>
+ </section>
+
+ <section class="screen auth" id="registration">
+  <button class="back" onclick="show('index')" aria-label="Назад">↶</button>
+  <div class="auth-title"><span>\\\РЕГИСТРАЦИЯ</span><span>\\\НОВОГО</span><span>\\\УЧАСТНИКА</span></div>
+  <form class="form" onsubmit="register(event)">
+   <input id="reg-name" placeholder="Имя" autocomplete="name" required maxlength="80">
+   <input id="reg-email" type="email" placeholder="address@gmail.com" autocomplete="email" required>
+   <input id="reg-password" type="password" placeholder="пароль" autocomplete="new-password" minlength="8" required>
+   <button class="primary submit" type="submit">отправить</button>
+  </form>
+  <p class="bottom-prompt">Есть аккаунт? <button onclick="show('login')">войти</button></p>
+ </section>
+
+ <section class="screen auth" id="login">
+  <button class="back" onclick="show('index')" aria-label="Назад">↶</button>
+  <div class="auth-title"><span>\\\ВОЙТИ</span><span>\\\В АККАУНТ</span></div>
+  <form class="form" onsubmit="loginUser(event)">
+   <input id="login-email" type="email" placeholder="address@gmail.com" autocomplete="email" required>
+   <input id="login-password" type="password" placeholder="пароль" autocomplete="current-password" required>
+   <button class="primary submit" type="submit">отправить</button>
+  </form>
+  <p class="bottom-prompt"><button class="inline-link" onclick="notify('Восстановление пароля подключим вместе с Supabase')">забыли пароль?</button><br><br>Нет аккаунта? <button onclick="show('registration')">зарегистрироваться</button></p>
+ </section>
+
+ <section class="screen auth" id="verification">
+  <button class="back" onclick="show('registration')" aria-label="Назад">↶</button>
+  <div class="auth-title"><span>\\\ПОДТВЕРЖДЕНИЕ</span><span>\\\EMAIL</span></div>
+  <p class="verify-copy">На адрес <strong id="verify-email-label">email@example.com</strong> отправлен шестизначный код. Введите его ниже.</p>
+  <form class="form" onsubmit="verifyCode(event)">
+   <input class="code-input" id="verify-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="______" aria-label="Шестизначный код" required>
+   <button class="primary submit" type="submit">подтвердить</button>
+  </form>
+  <div class="verify-actions"><button class="text-button" onclick="resendCode()">отправить код повторно</button></div>
+  <p class="verify-note">Письмо может попасть в папку «Спам».<br>Демо-режим: отправка писем пока не подключена.</p>
+ </section>
+
+ <section class="screen home" id="home">
+  <div class="home-top">
+   <button class="icon-button" aria-label="Уведомления" onclick="notify('Уведомлений пока нет')"><svg viewBox="0 0 24 24"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg></button>
+   <button class="icon-button" aria-label="Профиль" onclick="notify('Профиль пользователя добавим следующим этапом')"><svg viewBox="0 0 24 24"><circle cx="12" cy="7" r="3.5"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg></button>
+  </div>
+  <h2 class="home-heading"><button id="personal-tab" class="active" onclick="setCategory('personal')">ЛИЧНЫЕ</button><span> /// </span><button id="shared-tab" onclick="setCategory('shared')">ОБЩИЕ</button></h2>
+  <button class="add-note" aria-label="Создать заметку" onclick="createNote()">+</button>
+  <div class="note-list" id="note-list"></div>
+ </section>
+
+ <section class="screen editor" id="editor">
+  <div class="editor-toolbar">
+   <button class="icon-button" aria-label="Назад" onclick="saveAndBack()"><svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+   <div class="editor-tools">
+    <button class="icon-button" aria-label="Уведомления" onclick="notify('Уведомлений пока нет')"><svg viewBox="0 0 24 24"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg></button>
+    <button class="icon-button" aria-label="Профиль" onclick="notify('Профиль пользователя добавим следующим этапом')"><svg viewBox="0 0 24 24"><circle cx="12" cy="7" r="3.5"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg></button>
+   </div>
+  </div>
+  <div class="editor-divider"></div>
+  <input class="editor-title" id="note-title" placeholder="НАЗВАНИЕ ЗАМЕТКИ" maxlength="100">
+  <textarea class="editor-body" id="note-body" placeholder="Текст заметки..."></textarea>
+  <div class="editor-footer"><span id="editor-status">Новая заметка</span><button class="save-button" onclick="saveAndBack()">СОХРАНИТЬ</button></div>
+ </section>
+</main>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script>
+/*
+  Версия для первого деплоя: интерфейс и локальные заметки.
+  Реальная регистрация, OTP/email, исключение test@mail.ru и облачная синхронизация
+  подключаются через Supabase Auth + защищённую серверную логику.
+  Не добавляйте секретный service_role key в этот файл.
+*/
+const SCREEN_NAMES={index:'index',registration:'registration',login:'login',verification:'email verification',home:'home',editor:'note editor'};
+let pendingEmail='';
+let currentNoteId=null;
+let category='personal';
+const $=id=>document.getElementById(id);
+function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('active',s.id===id));$('screen-name').textContent=SCREEN_NAMES[id]||id;}
+function notify(message){const t=$('toast');t.textContent=message;t.classList.add('show');clearTimeout(window.toastTimer);window.toastTimer=setTimeout(()=>t.classList.remove('show'),2800);}
+function getNotes(){try{return JSON.parse(localStorage.getItem('universal-notes')||'[]')}catch{return []}}
+function putNotes(notes){localStorage.setItem('universal-notes',JSON.stringify(notes))}
+function renderNotes(){
+ const list=$('note-list');list.innerHTML='';
+ const notes=getNotes().filter(n=>(n.category||'personal')===category);
+ if(!notes.length){const empty=document.createElement('div');empty.style.cssText='color:#777;font-size:12px;padding:8px 4px';empty.textContent=category==='personal'?'Пока нет личных заметок. Нажмите +, чтобы создать первую.':'Общих заметок пока нет.';list.appendChild(empty);return}
+ notes.forEach(note=>{const b=document.createElement('button');b.className='note-pill';b.textContent=note.title||'Без названия';b.onclick=()=>openNote(note.id);list.appendChild(b)});
+}
+function setCategory(value){category=value;$('personal-tab').classList.toggle('active',value==='personal');$('shared-tab').classList.toggle('active',value==='shared');renderNotes();}
+function register(e){
+ e.preventDefault();pendingEmail=$('reg-email').value.trim().toLowerCase();
+ $('verify-email-label').textContent=pendingEmail;
+ // Исключение test@mail.ru будет применяться только на сервере после подключения Supabase.
+ // В статическом прототипе не имитируем подтверждение адреса или выдачу реальной сессии.
+ show('verification');
+ notify('Демо: экран подтверждения. Отправка письма ещё не подключена.');
+}
+function verifyCode(e){e.preventDefault();notify('Проверка кода появится после подключения Supabase Auth.');}
+function resendCode(){notify('Повторная отправка станет доступна после настройки SMTP в Supabase.');}
+function loginUser(e){e.preventDefault();notify('Авторизация станет доступна после подключения Supabase Auth.');}
+function createNote(){currentNoteId='note-'+crypto.randomUUID();$('note-title').value='';$('note-body').value='';$('editor-status').textContent='Новая заметка';show('editor');$('note-title').focus();}
+function openNote(id){const note=getNotes().find(n=>n.id===id);if(!note)return;currentNoteId=id;$('note-title').value=note.title||'';$('note-body').value=note.body||'';$('editor-status').textContent='Редактирование заметки';show('editor');}
+function saveAndBack(){
+ const title=$('note-title').value.trim(),body=$('note-body').value;
+ if(!title&&!body){show('home');renderNotes();notify('Пустая заметка не сохранена');return}
+ const notes=getNotes();const index=notes.findIndex(n=>n.id===currentNoteId);
+ const note={id:currentNoteId||('note-'+crypto.randomUUID()),title:title||'Без названия',body,category,createdAt:index>=0?notes[index].createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
+ if(index>=0)notes[index]=note;else notes.unshift(note);
+ putNotes(notes);show('home');renderNotes();notify('Заметка сохранена на этом устройстве');
+}
+renderNotes();
+</script>
+</body>
+</html>
