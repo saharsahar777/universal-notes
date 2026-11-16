@@ -103,7 +103,7 @@ button{cursor:pointer}
    <button class="primary submit" type="submit">подтвердить</button>
   </form>
   <div class="verify-actions"><button class="text-button" onclick="resendCode()">отправить код повторно</button></div>
-  <p class="verify-note">Письмо может попасть в папку «Спам».<br>Демо-режим: отправка писем пока не подключена.</p>
+  <p class="verify-note">Письмо может попасть в папку «Спам».<br>Введите код из письма Supabase. Если письма нет, проверьте папку «Спам».</p>
  </section>
 
  <section class="screen home" id="home">
@@ -147,8 +147,8 @@ button{cursor:pointer}
       YOUR_SUPABASE_PUBLISHABLE_KEY
    Не вставляйте сюда service_role или sb_secret.
    ========================================================= */
-const SUPABASE_URL = 'https://iiapwrpegckljazwpnct.supabase.co';
-const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_-udAJUpRjDMqDsmw_GqL0Q_nTPNxF7V';
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_PUBLISHABLE_KEY = 'YOUR_SUPABASE_PUBLISHABLE_KEY';
 
 let supabaseClient = null;
 const isSupabaseConfigured =
@@ -182,17 +182,106 @@ function renderNotes(){
  notes.forEach(note=>{const b=document.createElement('button');b.className='note-pill';b.textContent=note.title||'Без названия';b.onclick=()=>openNote(note.id);list.appendChild(b)});
 }
 function setCategory(value){category=value;$('personal-tab').classList.toggle('active',value==='personal');$('shared-tab').classList.toggle('active',value==='shared');renderNotes();}
-function register(e){
- e.preventDefault();pendingEmail=$('reg-email').value.trim().toLowerCase();
- $('verify-email-label').textContent=pendingEmail;
- // Исключение test@mail.ru будет применяться только на сервере после подключения Supabase.
- // В статическом прототипе не имитируем подтверждение адреса или выдачу реальной сессии.
- show('verification');
- notify('Демо: экран подтверждения. Отправка письма ещё не подключена.');
+async function register(e){
+ e.preventDefault();
+ if(!supabaseClient){notify('Supabase не настроен. Проверьте URL и Publishable Key.');return}
+ const name=$('reg-name').value.trim();
+ const email=$('reg-email').value.trim().toLowerCase();
+ const password=$('reg-password').value;
+ pendingEmail=email;
+ $('verify-email-label').textContent=email;
+ const submit=e.submitter;
+ if(submit){submit.disabled=true;submit.textContent='ОТПРАВКА...'}
+ try{
+  const {data,error}=await supabaseClient.auth.signUp({
+   email,password,options:{data:{name}}
+  });
+  if(error)throw error;
+  if(data.session){
+   notify('Аккаунт создан. Вход выполнен.');
+   show('home');await loadCloudNotesIfAvailable();
+  }else{
+   show('verification');
+   notify('Код подтверждения отправлен на почту.');
+  }
+ }catch(err){
+  console.error('Supabase signUp:',err);
+  notify(authErrorMessage(err));
+ }finally{
+  if(submit){submit.disabled=false;submit.textContent='отправить'}
+ }
 }
-function verifyCode(e){e.preventDefault();notify('Проверка кода появится после подключения Supabase Auth.');}
-function resendCode(){notify('Повторная отправка станет доступна после настройки SMTP в Supabase.');}
-function loginUser(e){e.preventDefault();notify('Авторизация станет доступна после подключения Supabase Auth.');}
+async function verifyCode(e){
+ e.preventDefault();
+ if(!supabaseClient){notify('Supabase не настроен.');return}
+ const token=$('verify-code').value.trim();
+ if(!pendingEmail){notify('Сначала начните регистрацию.');show('registration');return}
+ const submit=e.submitter;
+ if(submit){submit.disabled=true;submit.textContent='ПРОВЕРКА...'}
+ try{
+  const {data,error}=await supabaseClient.auth.verifyOtp({
+   email:pendingEmail,token,type:'signup'
+  });
+  if(error)throw error;
+  if(data.session){
+   notify('Email подтверждён. Добро пожаловать!');
+   show('home');await loadCloudNotesIfAvailable();
+  }else{
+   notify('Код принят, но сессия не создана. Попробуйте войти.');
+   show('login');
+  }
+ }catch(err){
+  console.error('Supabase verifyOtp:',err);
+  notify(authErrorMessage(err));
+ }finally{
+  if(submit){submit.disabled=false;submit.textContent='подтвердить'}
+ }
+}
+async function resendCode(){
+ if(!supabaseClient||!pendingEmail){notify('Сначала начните регистрацию.');return}
+ try{
+  const {error}=await supabaseClient.auth.resend({type:'signup',email:pendingEmail});
+  if(error)throw error;
+  notify('Новый код отправлен на почту.');
+ }catch(err){
+  console.error('Supabase resend:',err);
+  notify(authErrorMessage(err));
+ }
+}
+async function loginUser(e){
+ e.preventDefault();
+ if(!supabaseClient){notify('Supabase не настроен.');return}
+ const email=$('login-email').value.trim().toLowerCase();
+ const password=$('login-password').value;
+ const submit=e.submitter;
+ if(submit){submit.disabled=true;submit.textContent='ВХОД...'}
+ try{
+  const {data,error}=await supabaseClient.auth.signInWithPassword({email,password});
+  if(error)throw error;
+  if(data.session){
+   notify('Вы успешно вошли.');
+   show('home');await loadCloudNotesIfAvailable();
+  }
+ }catch(err){
+  console.error('Supabase signIn:',err);
+  notify(authErrorMessage(err));
+ }finally{
+  if(submit){submit.disabled=false;submit.textContent='отправить'}
+ }
+}
+function authErrorMessage(err){
+ const message=String(err?.message||'').toLowerCase();
+ if(message.includes('invalid login credentials'))return 'Неверный email или пароль.';
+ if(message.includes('email not confirmed'))return 'Сначала подтвердите email по коду из письма.';
+ if(message.includes('user already registered'))return 'Этот email уже зарегистрирован. Попробуйте войти.';
+ if(message.includes('password'))return 'Проверьте пароль: требуется не менее 8 символов.';
+ if(message.includes('rate limit'))return 'Слишком много запросов. Попробуйте немного позже.';
+ return err?.message||'Не удалось выполнить запрос. Попробуйте ещё раз.';
+}
+async function loadCloudNotesIfAvailable(){
+ // Загрузка заметок из облака подключается на следующем этапе.
+ renderNotes();
+}
 function createNote(){currentNoteId='note-'+crypto.randomUUID();$('note-title').value='';$('note-body').value='';$('editor-status').textContent='Новая заметка';show('editor');$('note-title').focus();}
 function openNote(id){const note=getNotes().find(n=>n.id===id);if(!note)return;currentNoteId=id;$('note-title').value=note.title||'';$('note-body').value=note.body||'';$('editor-status').textContent='Редактирование заметки';show('editor');}
 function saveAndBack(){
@@ -204,6 +293,16 @@ function saveAndBack(){
  putNotes(notes);show('home');renderNotes();notify('Заметка сохранена на этом устройстве');
 }
 renderNotes();
+if(supabaseClient){
+ supabaseClient.auth.getSession().then(async({data,error})=>{
+  if(error){console.error('Supabase getSession:',error);return}
+  if(data.session){show('home');await loadCloudNotesIfAvailable();}
+ });
+ supabaseClient.auth.onAuthStateChange((event,session)=>{
+  if(event==='SIGNED_OUT'){show('index');}
+  if(event==='SIGNED_IN'&&session){show('home');}
+ });
+}
 </script>
 </body>
 </html>
