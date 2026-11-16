@@ -131,13 +131,41 @@ button{cursor:pointer}
  </section>
 </main>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 /*
-  Версия для первого деплоя: интерфейс и локальные заметки.
+  Версия с подготовленным местом подключения Supabase: интерфейс и локальные заметки.
   Реальная регистрация, OTP/email, исключение test@mail.ru и облачная синхронизация
   подключаются через Supabase Auth + защищённую серверную логику.
   Не добавляйте секретный service_role key в этот файл.
 */
+
+/* =========================================================
+   SUPABASE CONFIGURATION
+   1) Вставьте Project URL вместо YOUR_SUPABASE_URL
+   2) Вставьте Publishable key (sb_publishable_...) вместо
+      YOUR_SUPABASE_PUBLISHABLE_KEY
+   Не вставляйте сюда service_role или sb_secret.
+   ========================================================= */
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_PUBLISHABLE_KEY = 'YOUR_SUPABASE_PUBLISHABLE_KEY';
+
+let supabaseClient = null;
+const isSupabaseConfigured =
+  window.supabase &&
+  SUPABASE_URL !== 'YOUR_SUPABASE_URL' &&
+  SUPABASE_PUBLISHABLE_KEY !== 'YOUR_SUPABASE_PUBLISHABLE_KEY';
+
+if (isSupabaseConfigured) {
+  supabaseClient = window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_PUBLISHABLE_KEY
+  );
+  console.info('Supabase client initialized.');
+} else {
+  console.info('Supabase is not configured yet. App runs in local demo mode.');
+}
+window.supabaseClient = supabaseClient;
 const SCREEN_NAMES={index:'index',registration:'registration',login:'login',verification:'email verification',home:'home',editor:'note editor'};
 let pendingEmail='';
 let currentNoteId=null;
