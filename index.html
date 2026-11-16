@@ -97,13 +97,13 @@ button{cursor:pointer}
  <section class="screen auth" id="verification">
   <button class="back" onclick="show('registration')" aria-label="Назад">↶</button>
   <div class="auth-title"><span>\\\ПОДТВЕРЖДЕНИЕ</span><span>\\\EMAIL</span></div>
-  <p class="verify-copy">На адрес <strong id="verify-email-label">email@example.com</strong> отправлен шестизначный код. Введите его ниже.</p>
-  <form class="form" onsubmit="verifyCode(event)">
-   <input class="code-input" id="verify-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="______" aria-label="Шестизначный код" required>
-   <button class="primary submit" type="submit">подтвердить</button>
-  </form>
-  <div class="verify-actions"><button class="text-button" onclick="resendCode()">отправить код повторно</button></div>
-  <p class="verify-note">Письмо может попасть в папку «Спам».<br>Введите код из письма Supabase. Если письма нет, проверьте папку «Спам».</p>
+  <p class="verify-copy">На адрес <strong id="verify-email-label">email@example.com</strong> отправлено письмо со ссылкой для подтверждения регистрации.</p>
+  <div class="verify-actions">
+   <p class="verify-copy" style="margin:0;color:#333">Откройте письмо и нажмите «Confirm email address». После подтверждения вы вернётесь в приложение автоматически.</p>
+   <button class="text-button" onclick="resendConfirmation()">отправить письмо повторно</button>
+   <button class="text-button" onclick="show('login')">перейти ко входу</button>
+  </div>
+  <p class="verify-note">Письмо может попасть в папку «Спам».<br>Не закрывайте страницу приложения, пока подтверждаете адрес.</p>
  </section>
 
  <section class="screen home" id="home">
@@ -134,9 +134,9 @@ button{cursor:pointer}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 /*
-  Версия с подготовленным местом подключения Supabase: интерфейс и локальные заметки.
-  Реальная регистрация, OTP/email, исключение test@mail.ru и облачная синхронизация
-  подключаются через Supabase Auth + защищённую серверную логику.
+  Версия с Supabase Auth: регистрация с подтверждением email по ссылке.
+  Облачные заметки, общие ссылки и серверное исключение test@mail.ru
+  подключаются отдельно. Не добавляйте секретный service_role key в этот файл.
   Не добавляйте секретный service_role key в этот файл.
 */
 
@@ -147,8 +147,8 @@ button{cursor:pointer}
       YOUR_SUPABASE_PUBLISHABLE_KEY
    Не вставляйте сюда service_role или sb_secret.
    ========================================================= */
-const SUPABASE_URL = 'https://iiapwrpegckljazwpnct.supabase.co';
-const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_-udAJUpRjDMqDsmw_GqL0Q_nTPNxF7V';
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_PUBLISHABLE_KEY = 'YOUR_SUPABASE_PUBLISHABLE_KEY';
 
 let supabaseClient = null;
 const isSupabaseConfigured =
@@ -194,7 +194,12 @@ async function register(e){
  if(submit){submit.disabled=true;submit.textContent='ОТПРАВКА...'}
  try{
   const {data,error}=await supabaseClient.auth.signUp({
-   email,password,options:{data:{name}}
+   email,
+   password,
+   options:{
+    data:{name},
+    emailRedirectTo:window.location.origin
+   }
   });
   if(error)throw error;
   if(data.session){
@@ -202,7 +207,7 @@ async function register(e){
    show('home');await loadCloudNotesIfAvailable();
   }else{
    show('verification');
-   notify('Код подтверждения отправлен на почту.');
+   notify('Письмо со ссылкой отправлено на почту.');
   }
  }catch(err){
   console.error('Supabase signUp:',err);
@@ -211,40 +216,18 @@ async function register(e){
   if(submit){submit.disabled=false;submit.textContent='отправить'}
  }
 }
-async function verifyCode(e){
- e.preventDefault();
- if(!supabaseClient){notify('Supabase не настроен.');return}
- const token=$('verify-code').value.trim();
- if(!pendingEmail){notify('Сначала начните регистрацию.');show('registration');return}
- const submit=e.submitter;
- if(submit){submit.disabled=true;submit.textContent='ПРОВЕРКА...'}
- try{
-  const {data,error}=await supabaseClient.auth.verifyOtp({
-   email:pendingEmail,token,type:'signup'
-  });
-  if(error)throw error;
-  if(data.session){
-   notify('Email подтверждён. Добро пожаловать!');
-   show('home');await loadCloudNotesIfAvailable();
-  }else{
-   notify('Код принят, но сессия не создана. Попробуйте войти.');
-   show('login');
-  }
- }catch(err){
-  console.error('Supabase verifyOtp:',err);
-  notify(authErrorMessage(err));
- }finally{
-  if(submit){submit.disabled=false;submit.textContent='подтвердить'}
- }
-}
-async function resendCode(){
+async function resendConfirmation(){
  if(!supabaseClient||!pendingEmail){notify('Сначала начните регистрацию.');return}
  try{
-  const {error}=await supabaseClient.auth.resend({type:'signup',email:pendingEmail});
+  const {error}=await supabaseClient.auth.resend({
+   type:'signup',
+   email:pendingEmail,
+   options:{emailRedirectTo:window.location.origin}
+  });
   if(error)throw error;
-  notify('Новый код отправлен на почту.');
+  notify('Письмо со ссылкой отправлено повторно.');
  }catch(err){
-  console.error('Supabase resend:',err);
+  console.error('Supabase resend confirmation:',err);
   notify(authErrorMessage(err));
  }
 }
@@ -272,7 +255,7 @@ async function loginUser(e){
 function authErrorMessage(err){
  const message=String(err?.message||'').toLowerCase();
  if(message.includes('invalid login credentials'))return 'Неверный email или пароль.';
- if(message.includes('email not confirmed'))return 'Сначала подтвердите email по коду из письма.';
+ if(message.includes('email not confirmed'))return 'Сначала подтвердите email по ссылке из письма.';
  if(message.includes('user already registered'))return 'Этот email уже зарегистрирован. Попробуйте войти.';
  if(message.includes('password'))return 'Проверьте пароль: требуется не менее 8 символов.';
  if(message.includes('rate limit'))return 'Слишком много запросов. Попробуйте немного позже.';
@@ -296,11 +279,24 @@ renderNotes();
 if(supabaseClient){
  supabaseClient.auth.getSession().then(async({data,error})=>{
   if(error){console.error('Supabase getSession:',error);return}
-  if(data.session){show('home');await loadCloudNotesIfAvailable();}
+  if(data.session){
+   show('home');
+   await loadCloudNotesIfAvailable();
+   if(window.location.search.includes('code=') || window.location.hash.includes('access_token=')){
+    notify('Email подтверждён. Вы вошли в приложение.');
+    window.history.replaceState({},document.title,window.location.pathname);
+   }
+  }
  });
  supabaseClient.auth.onAuthStateChange((event,session)=>{
   if(event==='SIGNED_OUT'){show('index');}
-  if(event==='SIGNED_IN'&&session){show('home');}
+  if(event==='SIGNED_IN'&&session){
+   show('home');
+   if(window.location.search.includes('code=') || window.location.hash.includes('access_token=')){
+    notify('Email подтверждён. Вы вошли в приложение.');
+    window.history.replaceState({},document.title,window.location.pathname);
+   }
+  }
  });
 }
 </script>
